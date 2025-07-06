@@ -37,7 +37,7 @@ if predict_button:
     st.header("预测结果")
     try:
         # 将输入特征转换为模型所需格式
-        input_array = np.array([OF_num, pancreatic_fis, pan_MDRO, blood_inf , age, OF_time, time_sur])
+        input_array = np.array([OF_num, pancreatic_fis, pan_MDRO, blood_inf , age, OF_time, time_sur]).reshape(1, -1)
         # 模型预测
         prediction = stacking_regressor.predict(input_array)[0]
 
