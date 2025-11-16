@@ -19,13 +19,13 @@ HIGH_RISK_THRESHOLD = 50.0  # 10–50% = intermediate, ≥50% = high
 # Page configuration
 # =========================
 st.set_page_config(
-    page_title="Bleeding Risk in Infected Pancreatic Necrosis",
+    page_title="IPN Hemorrhage Risk — Xiangya Hospital",
     layout="wide",
     page_icon="🩸",
 )
 
 # -------------------------
-# Session-level patient / session ID
+# Session-level ID
 # -------------------------
 if "session_id" not in st.session_state:
     st.session_state["session_id"] = "S-" + uuid.uuid4().hex[:8].upper()
@@ -33,7 +33,7 @@ if "session_id" not in st.session_state:
 session_id = st.session_state["session_id"]
 
 # =========================
-# Global style (CSS)
+# CSS Styling
 # =========================
 st.markdown(
     """
@@ -41,21 +41,21 @@ st.markdown(
         .main {
             padding: 0rem 3rem 3rem 3rem;
         }
-        /* Top header bar */
+        /* Xiangya header bar */
         .top-bar {
             background: linear-gradient(90deg, #0b7285, #1971c2);
-            padding: 0.9rem 1.6rem;
+            padding: 1.0rem 1.6rem;
             border-radius: 0 0 1.1rem 1.1rem;
             margin: -1.2rem -3rem 1.8rem -3rem;
             color: #ffffff;
         }
         .top-bar-title {
-            font-size: 1.35rem;
-            font-weight: 650;
+            font-size: 1.38rem;
+            font-weight: 700;
         }
         .top-bar-subtitle {
             font-size: 0.9rem;
-            opacity: 0.9;
+            opacity: 0.92;
         }
         .top-bar-right {
             font-size: 0.8rem;
@@ -95,28 +95,25 @@ st.markdown(
             color: #777777;
             font-size: 0.8rem;
         }
-        section[data-testid="stSidebar"] {
-            padding-top: 1rem;
-        }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 # =========================
-# Top bar (header like EASY-APP)
+# Top Bar — Xiangya Hospital Header
 # =========================
 header_html = f"""
 <div class="top-bar">
   <div style="display:flex;justify-content:space-between;align-items:center;">
     <div>
-      <div class="top-bar-title">Bleeding Risk Support in Infected Pancreatic Necrosis</div>
+      <div class="top-bar-title">Xiangya Hospital · IPN Hemorrhage Decision Support System</div>
       <div class="top-bar-subtitle">
-        Stacking ensemble · Research prototype · Gastrointestinal / intraluminal bleeding
+        Stacking Ensemble · Clinical Risk Prediction · Infected Pancreatic Necrosis (IPN)
       </div>
     </div>
     <div class="top-bar-right">
-      <div>Logged in as: <b>Guest</b></div>
+      <div>User: <b>Guest</b></div>
       <div>Session ID: {session_id}</div>
       <div>{datetime.now().strftime("%Y-%m-%d")}</div>
     </div>
@@ -126,123 +123,64 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # =========================
-# Page intro
+# Page introduction
 # =========================
-st.title("🩸 Stacking Model for Bleeding Risk in Infected Pancreatic Necrosis")
+st.title("🩸 Prediction of Intra-Abdominal Hemorrhage in Infected Pancreatic Necrosis (IPN)")
 
 st.markdown(
     """
-    This web application uses a stacking machine learning model to estimate the risk of 
-    **clinically relevant bleeding** in patients with **infected pancreatic necrosis (IPN)**, 
-    based on routinely collected clinical features.
+    This tool uses a **stacking machine learning model** to estimate the risk of  
+    **clinically significant intra-abdominal hemorrhage** in patients with  
+    **infected pancreatic necrosis (IPN)**.
 
-    Enter the patient characteristics in the left sidebar and click **Predict bleeding risk** 
-    to obtain an individualized risk estimate and visual model explanations based on SHAP.
+    Enter the patient characteristics in the sidebar and click  
+    **Predict hemorrhage risk** to obtain an individualized estimate and SHAP explanations.
     """
 )
 
-st.markdown(
-    "<p class='small-muted'>This tool is intended for research and educational purposes only and "
-    "must not be used as a stand-alone basis for clinical decisions.</p>",
-    unsafe_allow_html=True,
-)
-
 # =========================
-# Sidebar: input features
+# Sidebar Input
 # =========================
 with st.sidebar:
-    st.header("Input Features (IPN Cohort)")
+    st.header("Patient Features (IPN)")
 
-    OF_num = st.selectbox(
-        "Organ failure (0=None, 1=Single, 2=Multiple)",
-        options=[0, 1, 2],
-        index=0,
-        help="Maximum number of organ failures during the IPN course.",
-    )
-
-    pancreatic_fis = st.selectbox(
-        "Postoperative pancreatic fistula (0=No, 1=Yes)",
-        options=[0, 1],
-        index=0,
-    )
-
-    pan_MDRO = st.selectbox(
-        "Pus MDRO infection (0=No, 1=Yes)",
-        options=[0, 1],
-        index=0,
-        help="Presence of multidrug-resistant organisms in pancreatic / peripancreatic pus cultures.",
-    )
-
-    blood_inf = st.selectbox(
-        "Bloodstream infection (0=No, 1=Yes)",
-        options=[0, 1],
-        index=0,
-    )
-
-    age = st.number_input(
-        "Age (years)",
-        min_value=0,
-        max_value=120,
-        value=60,
-        step=1,
-    )
-
-    OF_time = st.number_input(
-        "Duration of organ failure (days)",
-        min_value=0,
-        max_value=365,
-        value=0,
-        step=1,
-    )
-
-    time_sur = st.number_input(
-        "Onset-to-intervention interval (days)",
-        min_value=0,
-        max_value=365,
-        value=0,
-        step=1,
-        help="Time from onset of acute pancreatitis to the first invasive intervention for IPN.",
-    )
+    OF_num = st.selectbox("Organ failure (0 / 1 / 2)", [0,1,2])
+    pancreatic_fis = st.selectbox("Postoperative pancreatic fistula (0=No,1=Yes)", [0,1])
+    pan_MDRO = st.selectbox("Pus MDRO infection (0=No,1=Yes)", [0,1])
+    blood_inf = st.selectbox("Bloodstream infection (0=No,1=Yes)", [0,1])
+    age = st.number_input("Age (years)", 0,120,60)
+    OF_time = st.number_input("Duration of organ failure (days)", 0,365,0)
+    time_sur = st.number_input("Onset-to-intervention interval (days)", 0,365,0)
 
     st.markdown("---")
-    predict_btn = st.button("▶ Predict bleeding risk", use_container_width=True)
+    predict_btn = st.button("▶ Predict hemorrhage risk", use_container_width=True)
     reset_btn = st.button("⟲ Reset session", use_container_width=True)
 
-# Reset: regenerate session ID
 if reset_btn:
     st.session_state["session_id"] = "S-" + uuid.uuid4().hex[:8].upper()
     st.experimental_rerun()
 
 # =========================
-# Utilities
+# Load model
 # =========================
-@st.cache_resource(show_spinner="Loading stacking model...")
-def load_model(path: str = "best_model_stack.pkl"):
-    model = joblib.load(path)
-    return model
+@st.cache_resource(show_spinner="Loading model…")
+def load_model(path="best_model_stack.pkl"):
+    return joblib.load(path)
 
-
-def load_image(path: str):
-    if os.path.exists(path):
-        return Image.open(path)
-    return None
-
+def load_image(path):
+    return Image.open(path) if os.path.exists(path) else None
 
 def build_export_csv(record: dict) -> str:
-    """Build a one-line CSV string with header for download."""
     buffer = StringIO()
     writer = csv.DictWriter(buffer, fieldnames=list(record.keys()))
-    writer.writeheader()
-    writer.writerow(record)
+    writer.writeheader(); writer.writerow(record)
     return buffer.getvalue()
 
-
 # =========================
-# Layout for main content
+# Main Layout
 # =========================
-col_left, col_right = st.columns([1.1, 1])
+col_left, col_right = st.columns([1.2,1])
 
-# ---------- Left: prediction ----------
 with col_left:
     st.subheader("Prediction Result")
 
@@ -250,200 +188,117 @@ with col_left:
     export_data = None
 
     if predict_btn:
-        try:
-            model = load_model()
 
-            X = np.array(
-                [[OF_num, pancreatic_fis, pan_MDRO, blood_inf, age, OF_time, time_sur]]
+        model = load_model()
+        X = np.array([[OF_num, pancreatic_fis, pan_MDRO, blood_inf,
+                       age, OF_time, time_sur]])
+
+        prob = float(model.predict_proba(X)[0][1])
+        prob = max(0.0, min(prob, 1.0))
+        pct = prob * 100
+
+        # Fixed risk thresholds
+        low_thr = LOW_RISK_THRESHOLD
+        high_thr = HIGH_RISK_THRESHOLD
+
+        if pct < low_thr:
+            risk_cat = "Low"
+            css_class = "risk-low"
+            pill_class = "pill-low"
+            risk_msg = (
+                "Low estimated risk of clinically significant intra-abdominal hemorrhage in IPN."
+            )
+        elif pct < high_thr:
+            risk_cat = "Intermediate"
+            css_class = "risk-medium"
+            pill_class = "pill-medium"
+            risk_msg = (
+                "Intermediate hemorrhage risk. Close clinical monitoring is recommended."
+            )
+        else:
+            risk_cat = "High"
+            css_class = "risk-high"
+            pill_class = "pill-high"
+            risk_msg = (
+                "High risk of intra-abdominal hemorrhage. Consider early imaging, vascular evaluation, "
+                "and multidisciplinary intervention."
             )
 
-            # Binary classification: probability of bleeding = class 1
-            prob = float(model.predict_proba(X)[0][1])
-            prob = max(0.0, min(prob, 1.0))  # safety clip
-            pct = prob * 100
-
-            # Fixed thresholds
-            low_thr = LOW_RISK_THRESHOLD
-            high_thr = HIGH_RISK_THRESHOLD
-
-            if pct < low_thr:
-                risk_cat = "Low"
-                css_class = "risk-low"
-                pill_class = "pill-low"
-                risk_msg = (
-                    "Low estimated risk of clinically relevant bleeding during the IPN course."
-                )
-            elif pct < high_thr:
-                risk_cat = "Intermediate"
-                css_class = "risk-medium"
-                pill_class = "pill-medium"
-                risk_msg = (
-                    "Intermediate bleeding risk. Close monitoring and optimisation of correctable "
-                    "factors are recommended."
-                )
-            else:
-                risk_cat = "High"
-                css_class = "risk-high"
-                pill_class = "pill-high"
-                risk_msg = (
-                    "High bleeding risk. Consider intensified surveillance and timely diagnostic "
-                    "or therapeutic interventions according to local practice."
-                )
-
-            # Result card
-            st.markdown(
-                f"""
-                <div class="risk-card {css_class}">
-                    <h4 style="margin-top:0;">Predicted bleeding risk: {pct:.1f}% 
-                        <span class="pill-label {pill_class}">{risk_cat} risk</span>
-                    </h4>
-                    <p style="margin-bottom:0;">{risk_msg}</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-            # Progress bar
-            st.progress(prob)
-
-            # Quick summary
-            with st.expander("Show input feature summary"):
-                st.write(
-                    {
-                        "Organ failure (0/1/2)": OF_num,
-                        "Postoperative pancreatic fistula (0/1)": pancreatic_fis,
-                        "Pus MDRO infection (0/1)": pan_MDRO,
-                        "Bloodstream infection (0/1)": blood_inf,
-                        "Age (years)": age,
-                        "Duration of organ failure (days)": OF_time,
-                        "Onset-to-intervention interval (days)": time_sur,
-                    }
-                )
-
-            # Prepare exportable data
-            export_data = {
-                "session_id": session_id,
-                "timestamp": datetime.now().isoformat(timespec="seconds"),
-                "bleeding_probability": f"{prob:.4f}",
-                "bleeding_risk_percent": f"{pct:.1f}",
-                "risk_category": risk_cat,
-                "OF_num": OF_num,
-                "postoperative_pancreatic_fistula": pancreatic_fis,
-                "pus_MDRO_infection": pan_MDRO,
-                "bloodstream_infection": blood_inf,
-                "age": age,
-                "OF_duration_days": OF_time,
-                "onset_to_intervention_days": time_sur,
-                "low_threshold_percent": low_thr,
-                "high_threshold_percent": high_thr,
-            }
-            prediction_made = True
-
-        except FileNotFoundError:
-            st.error(
-                "Model file `best_model_stack.pkl` was not found. "
-                "Please upload the trained model to the app directory."
-            )
-        except Exception as e:
-            st.error(f"An unexpected error occurred during prediction: **{e}**")
-    else:
-        st.info(
-            "Set the patient features in the sidebar and click "
-            "**Predict bleeding risk** to view the model output."
+        st.markdown(
+            f"""
+            <div class="risk-card {css_class}">
+                <h4 style="margin-top:0;">Predicted hemorrhage risk: {pct:.1f}% 
+                    <span class="pill-label {pill_class}">{risk_cat} risk</span>
+                </h4>
+                <p style="margin-bottom:0;">{risk_msg}</p>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-    # Download button (CSV)
-    if prediction_made and export_data is not None:
-        csv_content = build_export_csv(export_data)
+        st.progress(prob)
+
+        prediction_made = True
+
+        export_data = {
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "hemorrhage_probability": prob,
+            "hemorrhage_risk_percent": pct,
+            "risk_category": risk_cat,
+            "OF_num": OF_num,
+            "pancreatic_fistula": pancreatic_fis,
+            "MDRO_infection": pan_MDRO,
+            "bloodstream_infection": blood_inf,
+            "age": age,
+            "OF_duration_days": OF_time,
+            "onset_to_intervention_days": time_sur,
+        }
+
+    else:
+        st.info("Enter features in the sidebar and click **Predict hemorrhage risk**.")
+
+    if prediction_made:
+        csv_str = build_export_csv(export_data)
         st.download_button(
-            "💾 Download prediction as CSV",
-            data=csv_content,
-            file_name=f"IPN_bleeding_risk_{session_id}.csv",
+            "💾 Download prediction (CSV)",
+            csv_str,
+            file_name=f"IPN_hemorrhage_{session_id}.csv",
             mime="text/csv",
             use_container_width=True,
         )
 
-# ---------- Right: model overview ----------
 with col_right:
-    st.subheader("Model & Interpretation (IPN Cohort)")
+    st.subheader("Clinical Interpretation (IPN Hemorrhage)")
     st.markdown(
-        f"""
-        **Clinical context**  
-        Patients with **infected pancreatic necrosis (IPN)** are at substantial risk of 
-        gastrointestinal or intraluminal bleeding, especially in the presence of organ failure,
-        infection with multidrug-resistant organisms, and complex postoperative courses.
+        """
+        Patients with **infected pancreatic necrosis (IPN)** are at risk of  
+        **clinically significant intra-abdominal hemorrhage**, often due to:
 
-        **Model type**  
-        Stacking ensemble for binary classification of clinically relevant bleeding events.
+        - inflammatory erosion of major vessels  
+        - pseudoaneurysm formation  
+        - infected necrotic tissue invading vascular structures  
 
-        **Current predictor set**  
-        - Organ failure status (none / single / multiple)  
-        - Postoperative pancreatic fistula  
-        - Pus MDRO infection  
-        - Bloodstream infection  
-        - Age  
-        - Duration of organ failure  
-        - Onset-to-intervention interval  
-
-        **Risk stratification (fixed thresholds)**  
-        - Low risk: predicted probability **< {LOW_RISK_THRESHOLD:.0f}%**  
-        - Intermediate risk: **{LOW_RISK_THRESHOLD:.0f}–{HIGH_RISK_THRESHOLD:.0f}%**  
-        - High risk: **≥ {HIGH_RISK_THRESHOLD:.0f}%**
+        The stacking model integrates multiple predictors to estimate hemorrhage risk,  
+        assisting clinicians in early surveillance and decision-making.
         """
     )
 
-    with st.expander("How should the predicted risk be interpreted?"):
-        st.markdown(
-            """
-            - The **percentage value** corresponds to the model-estimated probability of 
-              clinically relevant bleeding during the IPN course.  
-            - **Low risk** patients may be candidates for standard monitoring if consistent 
-              with the overall clinical picture.  
-            - **Intermediate risk** suggests the need for closer observation and optimisation 
-              of haemodynamic status, anticoagulation, and infection control.  
-            - **High risk** should prompt careful evaluation for early imaging, endoscopic or 
-              interventional radiologic procedures, or multidisciplinary discussion, 
-              according to local guidelines and clinical judgement.
-            """
-        )
-
 # =========================
-# SHAP visualisation
+# SHAP Visualisation
 # =========================
 st.markdown("---")
-st.header("🔍 SHAP-Based Model Explanation")
-
-st.markdown(
-    """
-    SHAP (SHapley Additive exPlanations) values quantify the contribution of each feature to the
-    model prediction. The plots below summarise how individual variables influence the estimated 
-    bleeding risk, both at the level of base learners and for the final stacking model.
-    """
-)
+st.header("🔍 SHAP Model Explanation")
 
 tab1, tab2 = st.tabs(["Base learners", "Stacking model"])
 
 with tab1:
     img1 = load_image("summary_plot.png")
-    if img1 is not None:
-        st.image(
-            img1,
-            caption="SHAP feature importance of base learners in the first layer of the stacking model",
-            use_column_width=True,
-        )
-    else:
-        st.warning("Image `summary_plot.png` not found in the app directory.")
+    st.image(img1, caption="SHAP values — base learners", use_column_width=True) if img1 else st.warning("summary_plot.png not found.")
 
 with tab2:
     img2 = load_image("overall_shap.png")
-    if img2 is not None:
-        st.image(
-            img2,
-            caption="Global SHAP summary for the final stacking model",
-            use_column_width=True,
-        )
-    else:
-        st.warning("Image `overall_shap.png` not found in the app directory.")
+    st.image(img2, caption="SHAP summary — stacking model", use_column_width=True) if img2 else st.warning("overall_shap.png not found.")
 
 st.markdown("---")
-st.caption("© 2025 Infected Pancreatic Necrosis Bleeding Risk · Stacking model prototype built with Streamlit")
+st.caption("© 2025 Xiangya Hospital · IPN Hemorrhage Prediction System · Stacking Model Prototype")
