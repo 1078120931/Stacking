@@ -2,16 +2,22 @@
 # Imports
 # ============================================
 
-import os              # For checking image/model files
-import uuid            # For generating unique session ID
-import csv             # For CSV export
-from io import StringIO
+import os
+import uuid
+import csv
+from io import StringIO, BytesIO
 from datetime import datetime
 
-import numpy as np     # For model input array
-import joblib          # To load trained Stacking model
-from PIL import Image  # For loading SHAP images
-import streamlit as st # Core Streamlit framework
+import numpy as np
+import joblib
+from PIL import Image
+import streamlit as st
+
+# PDF generation
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+from reportlab.lib.styles import getSampleStyleSheet
 
 
 # ============================================
@@ -31,7 +37,7 @@ session_id = st.session_state["session_id"]
 
 
 # ============================================
-# Custom CSS styling
+# Custom CSS Styling
 # ============================================
 
 st.markdown(
@@ -184,12 +190,29 @@ def load_model(path="best_model_stack.pkl"):
 def load_image(path):
     return Image.open(path) if os.path.exists(path) else None
 
-def export_csv(record: dict) -> str:
-    buf = StringIO()
-    writer = csv.DictWriter(buf, fieldnames=list(record.keys()))
-    writer.writeheader()
-    writer.writerow(record)
-    return buf.getvalue()
+
+# ============================================
+# Generate PDF report
+# ============================================
+
+def generate_pdf(data: dict):
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(30, 800, "Xiangya Hospital")
+    c.drawString(30, 780, "IPN Hemorrhage Risk Report")
+
+    c.setFont("Helvetica", 11)
+    y = 745
+    for key, value in data.items():
+        c.drawString(30, y, f"{key}: {value}")
+        y -= 20
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
 
 
 # ============================================
@@ -215,19 +238,16 @@ with col_left:
         prob = float(max(0.0, min(prob, 1.0)))
         pct  = prob * 100
 
-        # Fixed thresholds (<10, 10–50, ≥50)
         if pct < 10:
             risk_cat   = "Low"
             css_class  = "risk-low"
             pill_class = "pill-low"
             risk_msg   = "Low estimated risk of clinically significant intra-abdominal hemorrhage in IPN."
-
         elif pct < 50:
             risk_cat   = "Intermediate"
             css_class  = "risk-medium"
             pill_class = "pill-medium"
             risk_msg   = "Intermediate hemorrhage risk. Close monitoring is recommended."
-
         else:
             risk_cat   = "High"
             css_class  = "risk-high"
@@ -252,54 +272,58 @@ with col_left:
 
         st.progress(prob)
 
-        # CSV export
-        csv_data = export_csv({
-            "session_id": session_id,
-            "timestamp": datetime.now().isoformat(timespec="seconds"),
-            "hemorrhage_probability": prob,
-            "risk_percent": pct,
-            "risk_category": risk_cat,
-            "OF_num": OF_num,
-            "pancreatic_fistula": pancreatic_fis,
-            "MDRO_infection": pan_MDRO,
-            "bloodstream_infection": blood_inf,
-            "age": age,
-            "OF_duration_days": OF_time,
-            "onset_to_intervention_days": time_sur,
-        })
+        # PDF export data
+        report_data = {
+            "Session ID": session_id,
+            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Hemorrhage Risk (%)": f"{pct:.1f}",
+            "Risk Category": risk_cat,
+            "Organ Failure": OF_num,
+            "Pancreatic Fistula": pancreatic_fis,
+            "Pus MDRO Infection": pan_MDRO,
+            "Bloodstream Infection": blood_inf,
+            "Age": age,
+            "OF Duration (days)": OF_time,
+            "Onset-to-intervention (days)": time_sur
+        }
 
+        # Download PDF button
+        pdf_file = generate_pdf(report_data)
         st.download_button(
-            "💾 Download prediction (CSV)",
-            csv_data,
-            file_name=f"IPN_hemorrhage_{session_id}.csv",
-            mime="text/csv",
+            label="🧾 Download PDF Report",
+            data=pdf_file,
+            file_name=f"IPN_hemorrhage_report_{session_id}.pdf",
+            mime="application/pdf",
             use_container_width=True,
         )
 
 
 # ============================================
-# Right side: Clinical explanation
+# Right side (Now without Clinical Context)
 # ============================================
 
 with col_right:
-    st.subheader("Clinical Interpretation (IPN Hemorrhage)")
+    st.subheader("Model Overview")
+
     st.markdown(
         """
-        Patients with **infected pancreatic necrosis (IPN)** are at risk of  
-        **clinically significant intra-abdominal hemorrhage**, often due to:
+        **Outcome**  
+        Probability of **intra-abdominal hemorrhage** in **infected pancreatic necrosis (IPN)**.
 
-        - vascular erosion caused by infected or necrotic tissue  
-        - pseudoaneurysm formation  
-        - inflammation extending to major vessels  
-
-        The stacking model integrates multiple predictors to estimate hemorrhage risk,  
-        assisting clinicians in early surveillance, triage, and decision-making.
+        **Predictor set**  
+        - Organ failure (0/1/2)  
+        - Postoperative pancreatic fistula  
+        - Pus MDRO infection  
+        - Bloodstream infection  
+        - Age  
+        - Duration of organ failure  
+        - Onset-to-intervention interval  
         """
     )
 
 
 # ============================================
-# SHAP visualisation
+# SHAP Visualisation
 # ============================================
 
 st.markdown("---")
