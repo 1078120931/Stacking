@@ -10,10 +10,16 @@ from PIL import Image
 import streamlit as st
 
 # =========================
+# Fixed risk thresholds (percent)
+# =========================
+LOW_RISK_THRESHOLD = 10.0   # <10% = low risk
+HIGH_RISK_THRESHOLD = 50.0  # 10–50% = intermediate, ≥50% = high
+
+# =========================
 # Page configuration
 # =========================
 st.set_page_config(
-    page_title="Stacking Bleeding Risk Calculator",
+    page_title="Bleeding Risk in Infected Pancreatic Necrosis",
     layout="wide",
     page_icon="🩸",
 )
@@ -89,7 +95,6 @@ st.markdown(
             color: #777777;
             font-size: 0.8rem;
         }
-        /* Make sidebar inputs a bit nicer */
         section[data-testid="stSidebar"] {
             padding-top: 1rem;
         }
@@ -99,15 +104,15 @@ st.markdown(
 )
 
 # =========================
-# Top bar (like EASY-APP header)
+# Top bar (header like EASY-APP)
 # =========================
 header_html = f"""
 <div class="top-bar">
   <div style="display:flex;justify-content:space-between;align-items:center;">
     <div>
-      <div class="top-bar-title">Bleeding Risk Decision Support</div>
+      <div class="top-bar-title">Bleeding Risk Support in Infected Pancreatic Necrosis</div>
       <div class="top-bar-subtitle">
-        Stacking ensemble · Research prototype · Postoperative bleeding
+        Stacking ensemble · Research prototype · Gastrointestinal / intraluminal bleeding
       </div>
     </div>
     <div class="top-bar-right">
@@ -123,21 +128,22 @@ st.markdown(header_html, unsafe_allow_html=True)
 # =========================
 # Page intro
 # =========================
-st.title("🩸 Stacking Model for Bleeding Risk Prediction")
+st.title("🩸 Stacking Model for Bleeding Risk in Infected Pancreatic Necrosis")
 
 st.markdown(
     """
     This web application uses a stacking machine learning model to estimate the risk of 
-    postoperative bleeding based on selected clinical features.
+    **clinically relevant bleeding** in patients with **infected pancreatic necrosis (IPN)**, 
+    based on routinely collected clinical features.
 
     Enter the patient characteristics in the left sidebar and click **Predict bleeding risk** 
-    to obtain an individualized risk estimate and visual explanations based on SHAP.
+    to obtain an individualized risk estimate and visual model explanations based on SHAP.
     """
 )
 
 st.markdown(
     "<p class='small-muted'>This tool is intended for research and educational purposes only and "
-    "should not replace clinical judgement.</p>",
+    "must not be used as a stand-alone basis for clinical decisions.</p>",
     unsafe_allow_html=True,
 )
 
@@ -145,17 +151,17 @@ st.markdown(
 # Sidebar: input features
 # =========================
 with st.sidebar:
-    st.header("Input Features")
+    st.header("Input Features (IPN Cohort)")
 
     OF_num = st.selectbox(
         "Organ failure (0=None, 1=Single, 2=Multiple)",
         options=[0, 1, 2],
         index=0,
-        help="Highest number of organ failures during the perioperative period.",
+        help="Maximum number of organ failures during the IPN course.",
     )
 
     pancreatic_fis = st.selectbox(
-        "Pancreatic fistula (0=No, 1=Yes)",
+        "Postoperative pancreatic fistula (0=No, 1=Yes)",
         options=[0, 1],
         index=0,
     )
@@ -164,7 +170,7 @@ with st.sidebar:
         "Pus MDRO infection (0=No, 1=Yes)",
         options=[0, 1],
         index=0,
-        help="Presence of multidrug-resistant organism (MDRO) in pus cultures.",
+        help="Presence of multidrug-resistant organisms in pancreatic / peripancreatic pus cultures.",
     )
 
     blood_inf = st.selectbox(
@@ -190,41 +196,19 @@ with st.sidebar:
     )
 
     time_sur = st.number_input(
-        "Onset-to-surgery interval (days)",
+        "Onset-to-intervention interval (days)",
         min_value=0,
         max_value=365,
         value=0,
         step=1,
-        help="Time from disease onset to definitive surgery.",
+        help="Time from onset of acute pancreatitis to the first invasive intervention for IPN.",
     )
-
-    # ---- Advanced settings: adjustable thresholds ----
-    with st.expander("Risk thresholds (advanced)"):
-        low_thr = st.slider(
-            "Upper limit for low risk (%)",
-            min_value=0.0,
-            max_value=50.0,
-            value=10.0,
-            step=1.0,
-        )
-        high_thr = st.slider(
-            "Upper limit for intermediate risk (%)",
-            min_value=low_thr,
-            max_value=100.0,
-            value=50.0,
-            step=1.0,
-        )
-        st.caption(
-            "Low risk: < low threshold · "
-            "Intermediate risk: between low and high thresholds · "
-            "High risk: ≥ high threshold."
-        )
 
     st.markdown("---")
     predict_btn = st.button("▶ Predict bleeding risk", use_container_width=True)
     reset_btn = st.button("⟲ Reset session", use_container_width=True)
 
-# Reset: simply regenerate session ID and rerun
+# Reset: regenerate session ID
 if reset_btn:
     st.session_state["session_id"] = "S-" + uuid.uuid4().hex[:8].upper()
     st.experimental_rerun()
@@ -278,23 +262,32 @@ with col_left:
             prob = max(0.0, min(prob, 1.0))  # safety clip
             pct = prob * 100
 
-            # Determine risk category based on adjustable thresholds
+            # Fixed thresholds
+            low_thr = LOW_RISK_THRESHOLD
+            high_thr = HIGH_RISK_THRESHOLD
+
             if pct < low_thr:
                 risk_cat = "Low"
                 css_class = "risk-low"
                 pill_class = "pill-low"
-                risk_msg = "Low estimated risk of postoperative bleeding."
+                risk_msg = (
+                    "Low estimated risk of clinically relevant bleeding during the IPN course."
+                )
             elif pct < high_thr:
                 risk_cat = "Intermediate"
                 css_class = "risk-medium"
                 pill_class = "pill-medium"
-                risk_msg = "Intermediate risk. Close monitoring is recommended."
+                risk_msg = (
+                    "Intermediate bleeding risk. Close monitoring and optimisation of correctable "
+                    "factors are recommended."
+                )
             else:
                 risk_cat = "High"
                 css_class = "risk-high"
                 pill_class = "pill-high"
                 risk_msg = (
-                    "High risk. Consider intensified surveillance and timely intervention."
+                    "High bleeding risk. Consider intensified surveillance and timely diagnostic "
+                    "or therapeutic interventions according to local practice."
                 )
 
             # Result card
@@ -318,12 +311,12 @@ with col_left:
                 st.write(
                     {
                         "Organ failure (0/1/2)": OF_num,
-                        "Pancreatic fistula (0/1)": pancreatic_fis,
+                        "Postoperative pancreatic fistula (0/1)": pancreatic_fis,
                         "Pus MDRO infection (0/1)": pan_MDRO,
                         "Bloodstream infection (0/1)": blood_inf,
                         "Age (years)": age,
                         "Duration of organ failure (days)": OF_time,
-                        "Onset-to-surgery interval (days)": time_sur,
+                        "Onset-to-intervention interval (days)": time_sur,
                     }
                 )
 
@@ -335,12 +328,12 @@ with col_left:
                 "bleeding_risk_percent": f"{pct:.1f}",
                 "risk_category": risk_cat,
                 "OF_num": OF_num,
-                "pancreatic_fistula": pancreatic_fis,
+                "postoperative_pancreatic_fistula": pancreatic_fis,
                 "pus_MDRO_infection": pan_MDRO,
                 "bloodstream_infection": blood_inf,
                 "age": age,
                 "OF_duration_days": OF_time,
-                "onset_to_surgery_days": time_sur,
+                "onset_to_intervention_days": time_sur,
                 "low_threshold_percent": low_thr,
                 "high_threshold_percent": high_thr,
             }
@@ -365,45 +358,52 @@ with col_left:
         st.download_button(
             "💾 Download prediction as CSV",
             data=csv_content,
-            file_name=f"bleeding_risk_{session_id}.csv",
+            file_name=f"IPN_bleeding_risk_{session_id}.csv",
             mime="text/csv",
             use_container_width=True,
         )
 
-# ---------- Right: model overview & thresholds ----------
+# ---------- Right: model overview ----------
 with col_right:
-    st.subheader("Model & Threshold Overview")
+    st.subheader("Model & Interpretation (IPN Cohort)")
     st.markdown(
-        """
+        f"""
+        **Clinical context**  
+        Patients with **infected pancreatic necrosis (IPN)** are at substantial risk of 
+        gastrointestinal or intraluminal bleeding, especially in the presence of organ failure,
+        infection with multidrug-resistant organisms, and complex postoperative courses.
+
         **Model type**  
-        Stacking ensemble for binary classification of postoperative bleeding.
+        Stacking ensemble for binary classification of clinically relevant bleeding events.
 
-        **Outcome**  
-        Probability of clinically relevant postoperative bleeding (yes / no).
-
-        **Predictor set (current version)**  
+        **Current predictor set**  
         - Organ failure status (none / single / multiple)  
-        - Presence of pancreatic fistula  
+        - Postoperative pancreatic fistula  
         - Pus MDRO infection  
         - Bloodstream infection  
         - Age  
         - Duration of organ failure  
-        - Onset-to-surgery interval  
+        - Onset-to-intervention interval  
 
-        The model combines multiple base learners and is calibrated on an internal cohort.  
-        Thresholds for risk categories can be adjusted in the sidebar to match local practice 
-        or specific study protocols.
+        **Risk stratification (fixed thresholds)**  
+        - Low risk: predicted probability **< {LOW_RISK_THRESHOLD:.0f}%**  
+        - Intermediate risk: **{LOW_RISK_THRESHOLD:.0f}–{HIGH_RISK_THRESHOLD:.0f}%**  
+        - High risk: **≥ {HIGH_RISK_THRESHOLD:.0f}%**
         """
     )
 
-    with st.expander("How to interpret the risk estimate?"):
+    with st.expander("How should the predicted risk be interpreted?"):
         st.markdown(
             """
-            - The **percentage value** represents the model-estimated probability of bleeding.  
-            - **Low risk** usually corresponds to patients suitable for routine monitoring.  
-            - **Intermediate risk** suggests closer observation or optimisation of modifiable factors.  
-            - **High risk** may justify intensified surveillance, early imaging, or proactive intervention, 
-              depending on local guidelines and clinical judgement.
+            - The **percentage value** corresponds to the model-estimated probability of 
+              clinically relevant bleeding during the IPN course.  
+            - **Low risk** patients may be candidates for standard monitoring if consistent 
+              with the overall clinical picture.  
+            - **Intermediate risk** suggests the need for closer observation and optimisation 
+              of haemodynamic status, anticoagulation, and infection control.  
+            - **High risk** should prompt careful evaluation for early imaging, endoscopic or 
+              interventional radiologic procedures, or multidisciplinary discussion, 
+              according to local guidelines and clinical judgement.
             """
         )
 
@@ -417,7 +417,7 @@ st.markdown(
     """
     SHAP (SHapley Additive exPlanations) values quantify the contribution of each feature to the
     model prediction. The plots below summarise how individual variables influence the estimated 
-    bleeding risk both at the level of base learners and for the aggregated stacking model.
+    bleeding risk, both at the level of base learners and for the final stacking model.
     """
 )
 
@@ -446,4 +446,4 @@ with tab2:
         st.warning("Image `overall_shap.png` not found in the app directory.")
 
 st.markdown("---")
-st.caption("© 2025 Bleeding Risk Stacking Model · Research prototype built with Streamlit")
+st.caption("© 2025 Infected Pancreatic Necrosis Bleeding Risk · Stacking model prototype built with Streamlit")
