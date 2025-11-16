@@ -74,7 +74,7 @@ st.markdown(
             border-left: 6px solid #43a047;
         }
         .risk-medium {
-            background: #fff8e1;
+           背景: #fff8e1;
             border-left: 6px solid #ffa000;
         }
         .risk-high {
@@ -168,8 +168,9 @@ with st.sidebar:
         help="Highest number of organ failures during the IPN disease course.",
     )
 
+    # 改成 Pancreatic fistula，不再写 postoperative
     pancreatic_fis = st.selectbox(
-        "Postoperative pancreatic fistula (0=No, 1=Yes)",
+        "Pancreatic fistula (0=No, 1=Yes)",
         options=[0, 1],
         index=0,
     )
@@ -239,7 +240,7 @@ def load_image(path: str):
 
 
 # ============================================
-# 纯 Python 生成最简 PDF（不依赖额外库）
+# 纯 Python 生成较美观的单页 PDF（带行距，不重叠）
 # ============================================
 
 def _pdf_escape(text: str) -> str:
@@ -249,15 +250,24 @@ def _pdf_escape(text: str) -> str:
 
 def generate_pdf(data: dict) -> bytes:
     """
-    生成一个非常简单的单页 PDF，包含若干行 key: value 文本。
-    不依赖任何第三方库，适合 Streamlit Cloud 环境。
+    生成一个简洁单页 PDF：
+    - 顶部标题两行
+    - 下面按行距 14pt 逐行打印 key: value
+    不依赖第三方库，适合 Streamlit Cloud 环境。
     """
-    lines = [f"{k}: {v}" for k, v in data.items()]
+    lines = [
+        "Xiangya Hospital",
+        "IPN Intra-Abdominal Hemorrhage Risk Report",
+        "",  # 空行
+    ]
+    for k, v in data.items():
+        lines.append(f"{k}: {v}")
 
     content_lines = []
     content_lines.append("BT")
     content_lines.append("/F1 12 Tf")
-    content_lines.append("50 800 Td")
+    content_lines.append("14 TL")               # 设置行距 14pt
+    content_lines.append("1 0 0 1 50 800 Tm")   # 文本起始位置 (x=50, y=800)
 
     first = True
     for line in lines:
@@ -265,7 +275,7 @@ def generate_pdf(data: dict) -> bytes:
             content_lines.append(f"({_pdf_escape(line)}) Tj")
             first = False
         else:
-            content_lines.append("T*")
+            content_lines.append("T*")  # 按 TL 往下移一行
             content_lines.append(f"({_pdf_escape(line)}) Tj")
 
     content_lines.append("ET")
@@ -286,7 +296,6 @@ def generate_pdf(data: dict) -> bytes:
 
     objects = [obj1, obj2, obj3, obj4, obj5]
 
-    # 拼接 PDF
     header = b"%PDF-1.4\n"
     offsets = []
     current_offset = len(header)
@@ -320,8 +329,6 @@ col_left, col_right = st.columns([1.1, 1])
 # ---------- Left: prediction ----------
 with col_left:
     st.subheader("Prediction Result")
-
-    prediction_made = False
 
     if predict_btn:
         try:
@@ -376,7 +383,7 @@ with col_left:
             # 显示进度条
             st.progress(prob)
 
-            # 生成 PDF 报告的数据
+            # 生成 PDF 报告的数据（这里的 Key 也统一成 Pancreatic fistula）
             report_data = {
                 "Session ID": session_id,
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -392,7 +399,6 @@ with col_left:
             }
 
             pdf_bytes = generate_pdf(report_data)
-            prediction_made = True
 
             st.download_button(
                 "🧾 Download PDF report",
@@ -426,7 +432,7 @@ with col_right:
 
         **Predictor set (current version)**  
         - Organ failure status (none / single / multiple)  
-        - Postoperative pancreatic fistula  
+        - Pancreatic fistula  
         - Pus MDRO infection  
         - Bloodstream infection  
         - Age  
