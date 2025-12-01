@@ -2,16 +2,15 @@
 # Imports（每行都标注用途）
 # ============================================
 
-import os                  # 文件与路径操作（检查图片、模型文件是否存在）
-import uuid                # 生成唯一的 session ID，方便区分每次预测
-import csv                 # 预留：如需导出 CSV 报告可使用（当前未强制使用）
-from io import StringIO    # 预留：如需在内存中构建 CSV 文本可使用
-from datetime import datetime  # 获取当前日期与时间，用于报告与页面显示
+import os                  # 文件与路径操作（检查模型文件是否存在）
+import uuid                # 生成唯一的 session ID
+import csv                 # 预留
+from io import StringIO    # 预留
+from datetime import datetime  # 获取当前日期与时间
 
-import numpy as np         # 处理数值数组，构建模型输入 X
-import joblib              # 加载训练好的 stacking 模型（.pkl 文件）
-from PIL import Image      # 加载 PNG 图像
-import streamlit as st     # 构建 Web 界面的核心库
+import numpy as np         # 处理数值数组
+import joblib              # 加载训练好的 stacking 模型
+import streamlit as st     # 构建 Web 界面
 
 
 # ============================================
@@ -107,7 +106,7 @@ st.markdown(
 
 
 # ============================================
-# 顶部栏（类似 EASY-APP header）
+# 顶部栏
 # ============================================
 
 header_html = f"""
@@ -143,7 +142,7 @@ st.markdown(
     **infected pancreatic necrosis (IPN)**.
 
     Enter the patient characteristics in the left sidebar and click 
-    **Predict hemorrhage risk** to obtain an individualized risk estimate and visual explanations.
+    **Predict hemorrhage risk** to obtain an individualized risk estimate.
     """
 )
 
@@ -168,7 +167,6 @@ with st.sidebar:
         help="Highest number of organ failures during the IPN disease course.",
     )
 
-    # 改成 Pancreatic fistula，不再写 postoperative
     pancreatic_fis = st.selectbox(
         "Pancreatic fistula (0=No, 1=Yes)",
         options=[0, 1],
@@ -217,14 +215,14 @@ with st.sidebar:
     predict_btn = st.button("▶ Predict hemorrhage risk", use_container_width=True)
     reset_btn = st.button("⟲ Reset session", use_container_width=True)
 
-# Reset: simply regenerate session ID and rerun
+# Reset logic
 if reset_btn:
     st.session_state["session_id"] = "S-" + uuid.uuid4().hex[:8].upper()
     st.experimental_rerun()
 
 
 # ============================================
-# Utilities：加载模型、图片
+# Utilities：加载模型
 # ============================================
 
 @st.cache_resource(show_spinner="Loading stacking model...")
@@ -232,14 +230,9 @@ def load_model(path: str = "best_model_stack.pkl"):
     model = joblib.load(path)
     return model
 
-def load_image(path: str):
-    if os.path.exists(path):
-        return Image.open(path)
-    return None
-
 
 # ============================================
-# 纯 Python 生成较美观的单页 PDF（带行距，不重叠）
+# PDF生成函数
 # ============================================
 
 def _pdf_escape(text: str) -> str:
@@ -248,12 +241,6 @@ def _pdf_escape(text: str) -> str:
 
 
 def generate_pdf(data: dict) -> bytes:
-    """
-    生成一个简洁单页 PDF：
-    - 顶部标题两行
-    - 下面按行距 14pt 逐行打印 key: value
-    不依赖第三方库，适合 Streamlit Cloud 环境。
-    """
     lines = [
         "Xiangya Hospital",
         "IPN Abdominal Hemorrhage Risk Report",
@@ -265,8 +252,8 @@ def generate_pdf(data: dict) -> bytes:
     content_lines = []
     content_lines.append("BT")
     content_lines.append("/F1 12 Tf")
-    content_lines.append("14 TL")                # 设置行距 14pt
-    content_lines.append("1 0 0 1 50 800 Tm")    # 文本起始位置 (x=50, y=800)
+    content_lines.append("14 TL")
+    content_lines.append("1 0 0 1 50 800 Tm")
 
     first = True
     for line in lines:
@@ -274,13 +261,13 @@ def generate_pdf(data: dict) -> bytes:
             content_lines.append(f"({_pdf_escape(line)}) Tj")
             first = False
         else:
-            content_lines.append("T*")  # 按 TL 往下移一行
+            content_lines.append("T*")
             content_lines.append(f"({_pdf_escape(line)}) Tj")
 
     content_lines.append("ET")
     stream_content = "\n".join(content_lines).encode("latin-1")
 
-    # 对象定义
+    # PDF 对象构建
     obj1 = b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
     obj2 = b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
     obj3 = b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n"
@@ -294,29 +281,23 @@ def generate_pdf(data: dict) -> bytes:
     obj5 = b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
 
     objects = [obj1, obj2, obj3, obj4, obj5]
-
     header = b"%PDF-1.4\n"
     offsets = []
     current_offset = len(header)
-
     for obj in objects:
         offsets.append(current_offset)
         current_offset += len(obj)
-
     xref_offset = current_offset
     xref_entries = [b"xref\n0 6\n", b"0000000000 65535 f \n"]
     for off in offsets:
         xref_entries.append(f"{off:010d} 00000 n \n".encode("ascii"))
     xref = b"".join(xref_entries)
-
     trailer = (
         b"trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n"
         + str(xref_offset).encode("ascii")
         + b"\n%%EOF\n"
     )
-
-    pdf_bytes = header + b"".join(objects) + xref + trailer
-    return pdf_bytes
+    return header + b"".join(objects) + xref + trailer
 
 
 # ============================================
@@ -339,32 +320,24 @@ with col_left:
 
             # Binary classification: probability of hemorrhage = class 1
             prob = float(model.predict_proba(X)[0][1])
-            prob = max(0.0, min(prob, 1.0))  # safety clip
+            prob = max(0.0, min(prob, 1.0))
             pct = prob * 100
 
-            # 固定阈值：<10 低，10–50 中，≥50 高
             if pct < 10:
                 risk_cat = "Low"
                 css_class = "risk-low"
                 pill_class = "pill-low"
-                risk_msg = (
-                    "Low estimated risk of clinically significant abdominal hemorrhage in IPN."
-                )
+                risk_msg = "Low estimated risk of clinically significant abdominal hemorrhage in IPN."
             elif pct < 50:
                 risk_cat = "Intermediate"
                 css_class = "risk-medium"
                 pill_class = "pill-medium"
-                risk_msg = (
-                    "Intermediate risk of abdominal hemorrhage. Close monitoring is recommended."
-                )
+                risk_msg = "Intermediate risk of abdominal hemorrhage. Close monitoring is recommended."
             else:
                 risk_cat = "High"
                 css_class = "risk-high"
                 pill_class = "pill-high"
-                risk_msg = (
-                    "High risk of clinically significant abdominal hemorrhage. "
-                    "Consider early vascular evaluation, imaging, and timely intervention."
-                )
+                risk_msg = "High risk of clinically significant abdominal hemorrhage. Consider early vascular evaluation and intervention."
 
             # Result card
             st.markdown(
@@ -379,19 +352,18 @@ with col_left:
                 unsafe_allow_html=True,
             )
 
-            # 显示进度条
             st.progress(prob)
 
-            # 生成 PDF 报告的数据
+            # 生成 PDF 报告
             report_data = {
                 "Session ID": session_id,
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "Hemorrhage risk (%)": f"{pct:.1f}",
                 "Risk category": risk_cat,
-                "Organ failure (0/1/2)": OF_num,
-                "Pancreatic fistula (0/1)": pancreatic_fis,
-                "Pus MDRO infection (0/1)": pan_MDRO,
-                "Bloodstream infection (0/1)": blood_inf,
+                "Organ failure": OF_num,
+                "Pancreatic fistula": pancreatic_fis,
+                "Pus MDRO infection": pan_MDRO,
+                "Bloodstream infection": blood_inf,
                 "Age (years)": age,
                 "OF duration (days)": OF_time,
                 "Onset-to-intervention (days)": time_sur,
@@ -408,17 +380,11 @@ with col_left:
             )
 
         except FileNotFoundError:
-            st.error(
-                "Model file `best_model_stack.pkl` was not found. "
-                "Please upload the trained model to the app directory."
-            )
+            st.error("Model file `best_model_stack.pkl` was not found. Please upload it.")
         except Exception as e:
-            st.error(f"An unexpected error occurred during prediction: **{e}**")
+            st.error(f"Error: {e}")
     else:
-        st.info(
-            "Set the patient features in the sidebar and click "
-            "**Predict hemorrhage risk** to view the model output."
-        )
+        st.info("Set patient features in the sidebar and click **Predict hemorrhage risk**.")
 
 
 # ---------- Right: model overview ----------
@@ -428,7 +394,7 @@ with col_right:
         """
         **Outcome** Probability of **abdominal hemorrhage** in patients with **infected pancreatic necrosis (IPN)**.
 
-        **Predictor set (current version)** - Organ failure status (none / single / multiple)  
+        **Predictor set** - Organ failure status (none / single / multiple)  
         - Pancreatic fistula  
         - Pus MDRO infection  
         - Bloodstream infection  
@@ -437,33 +403,6 @@ with col_right:
         - Onset-to-intervention interval  
         """
     )
-
-
-# ============================================
-# SHAP visualisation (Only Overall)
-# ============================================
-
-st.markdown("---")
-st.subheader("🔍 SHAP-Based Model Explanation")
-
-st.markdown(
-    """
-    SHAP (SHapley Additive exPlanations) values quantify the contribution of each feature to the
-    predicted risk of abdominal hemorrhage in IPN.
-    """
-)
-
-# 直接加载并显示 overall_shap.png，不使用 tabs
-img_shap = load_image("overall_shap.png")
-if img_shap is not None:
-    st.image(
-        img_shap,
-        caption="Global SHAP summary for the stacking model",
-        use_container_width=True,
-    )
-else:
-    # 如果找不到图片，可以根据需要选择报错或静默
-    st.info("SHAP explanation image (`overall_shap.png`) not found.")
 
 
 # ============================================
