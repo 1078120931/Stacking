@@ -10,7 +10,7 @@ from datetime import datetime  # 获取当前日期与时间，用于报告与�
 
 import numpy as np         # 处理数值数组，构建模型输入 X
 import joblib              # 加载训练好的 stacking 模型（.pkl 文件）
-from PIL import Image      # 加载 PNG 格式的 SHAP 图像
+from PIL import Image      # 加载 PNG 图像
 import streamlit as st     # 构建 Web 界面的核心库
 
 
@@ -74,7 +74,7 @@ st.markdown(
             border-left: 6px solid #43a047;
         }
         .risk-medium {
-           背景: #fff8e1;
+           background: #fff8e1;
             border-left: 6px solid #ffa000;
         }
         .risk-high {
@@ -116,7 +116,7 @@ header_html = f"""
     <div>
       <div class="top-bar-title">IPN Hemorrhage Decision Support</div>
       <div class="top-bar-subtitle">
-        Stacking ensemble · Research prototype · Intra-abdominal hemorrhage in IPN
+        Stacking ensemble · Research prototype · Abdominal hemorrhage in IPN
       </div>
     </div>
     <div class="top-bar-right">
@@ -139,11 +139,11 @@ st.title("🩸 Stacking Model for Hemorrhage Risk Prediction in Infected Pancrea
 st.markdown(
     """
     This web application uses a stacking machine learning model to estimate the risk of 
-    **clinically significant intra-abdominal hemorrhage** in patients with 
+    **clinically significant abdominal hemorrhage** in patients with 
     **infected pancreatic necrosis (IPN)**.
 
     Enter the patient characteristics in the left sidebar and click 
-    **Predict hemorrhage risk** to obtain an individualized risk estimate and visual explanations based on SHAP.
+    **Predict hemorrhage risk** to obtain an individualized risk estimate and visual explanations.
     """
 )
 
@@ -232,7 +232,6 @@ def load_model(path: str = "best_model_stack.pkl"):
     model = joblib.load(path)
     return model
 
-
 def load_image(path: str):
     if os.path.exists(path):
         return Image.open(path)
@@ -257,7 +256,7 @@ def generate_pdf(data: dict) -> bytes:
     """
     lines = [
         "Xiangya Hospital",
-        "IPN Intra-Abdominal Hemorrhage Risk Report",
+        "IPN Abdominal Hemorrhage Risk Report",
         "",  # 空行
     ]
     for k, v in data.items():
@@ -266,8 +265,8 @@ def generate_pdf(data: dict) -> bytes:
     content_lines = []
     content_lines.append("BT")
     content_lines.append("/F1 12 Tf")
-    content_lines.append("14 TL")               # 设置行距 14pt
-    content_lines.append("1 0 0 1 50 800 Tm")   # 文本起始位置 (x=50, y=800)
+    content_lines.append("14 TL")                # 设置行距 14pt
+    content_lines.append("1 0 0 1 50 800 Tm")    # 文本起始位置 (x=50, y=800)
 
     first = True
     for line in lines:
@@ -349,21 +348,21 @@ with col_left:
                 css_class = "risk-low"
                 pill_class = "pill-low"
                 risk_msg = (
-                    "Low estimated risk of clinically significant intra-abdominal hemorrhage in IPN."
+                    "Low estimated risk of clinically significant abdominal hemorrhage in IPN."
                 )
             elif pct < 50:
                 risk_cat = "Intermediate"
                 css_class = "risk-medium"
                 pill_class = "pill-medium"
                 risk_msg = (
-                    "Intermediate risk of intra-abdominal hemorrhage. Close monitoring is recommended."
+                    "Intermediate risk of abdominal hemorrhage. Close monitoring is recommended."
                 )
             else:
                 risk_cat = "High"
                 css_class = "risk-high"
                 pill_class = "pill-high"
                 risk_msg = (
-                    "High risk of clinically significant intra-abdominal hemorrhage. "
+                    "High risk of clinically significant abdominal hemorrhage. "
                     "Consider early vascular evaluation, imaging, and timely intervention."
                 )
 
@@ -383,7 +382,7 @@ with col_left:
             # 显示进度条
             st.progress(prob)
 
-            # 生成 PDF 报告的数据（这里的 Key 也统一成 Pancreatic fistula）
+            # 生成 PDF 报告的数据
             report_data = {
                 "Session ID": session_id,
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -424,14 +423,12 @@ with col_left:
 
 # ---------- Right: model overview ----------
 with col_right:
-    st.subheader("Model Overview (IPN Hemorrhage)")
+    st.subheader("Model Overview")
     st.markdown(
         """
-        **Outcome**  
-        Probability of **intra-abdominal hemorrhage** in patients with **infected pancreatic necrosis (IPN)**.
+        **Outcome** Probability of **abdominal hemorrhage** in patients with **infected pancreatic necrosis (IPN)**.
 
-        **Predictor set (current version)**  
-        - Organ failure status (none / single / multiple)  
+        **Predictor set (current version)** - Organ failure status (none / single / multiple)  
         - Pancreatic fistula  
         - Pus MDRO infection  
         - Bloodstream infection  
@@ -443,42 +440,35 @@ with col_right:
 
 
 # ============================================
-# SHAP visualisation
+# SHAP visualisation (Only Overall)
 # ============================================
 
 st.markdown("---")
-st.header("🔍 SHAP-Based Model Explanation")
+st.subheader("🔍 SHAP-Based Model Explanation")
 
 st.markdown(
     """
     SHAP (SHapley Additive exPlanations) values quantify the contribution of each feature to the
-    predicted risk of intra-abdominal hemorrhage in IPN.
+    predicted risk of abdominal hemorrhage in IPN.
     """
 )
 
-tab1, tab2 = st.tabs(["Base learners", "Stacking model"])
+# 直接加载并显示 overall_shap.png，不使用 tabs
+img_shap = load_image("overall_shap.png")
+if img_shap is not None:
+    st.image(
+        img_shap,
+        caption="Global SHAP summary for the stacking model",
+        use_container_width=True,
+    )
+else:
+    # 如果找不到图片，可以根据需要选择报错或静默
+    st.info("SHAP explanation image (`overall_shap.png`) not found.")
 
-with tab1:
-    img1 = load_image("summary_plot.png")
-    if img1 is not None:
-        st.image(
-            img1,
-            caption="SHAP feature importance of base learners in the first layer of the stacking model",
-            use_column_width=True,
-        )
-    else:
-        st.warning("Image `summary_plot.png` not found in the app directory.")
 
-with tab2:
-    img2 = load_image("overall_shap.png")
-    if img2 is not None:
-        st.image(
-            img2,
-            caption="Global SHAP summary for the final stacking model (IPN hemorrhage)",
-            use_column_width=True,
-        )
-    else:
-        st.warning("Image `overall_shap.png` not found in the app directory.")
+# ============================================
+# Footer
+# ============================================
 
 st.markdown("---")
-st.caption("© 2025 Xiangya Hospital · IPN Intra-Abdominal Hemorrhage Prediction System")
+st.caption("© 2025 Xiangya Hospital · IPN Abdominal Hemorrhage Prediction System")
