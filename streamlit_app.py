@@ -403,6 +403,22 @@ with col_right:
         - Onset-to-intervention interval  
         """
     )
+# ============================================
+# SHAP overall feature contribution figure
+# ============================================
+
+st.markdown("---")
+st.subheader("SHAP Feature Contribution (Overall)")
+
+img_path = "Based on the overall feature contribution analysis of SHAP to the stacking model.png"
+if os.path.exists(img_path):
+    st.image(
+        img_path,
+        caption="Based on the overall feature contribution analysis of SHAP to the stacking model",
+        use_container_width=True,
+    )
+else:
+    st.warning(f"Figure not found: {img_path}")
 
 
 # ============================================
@@ -411,3 +427,4 @@ with col_right:
 
 st.markdown("---")
 st.caption("© 2025 Xiangya Hospital · IPN Abdominal Hemorrhage Prediction System")
+
